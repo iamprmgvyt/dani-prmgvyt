@@ -61,14 +61,14 @@ function otherUser(username) {
   return username === 'dani' ? 'prmgvyt' : 'dani';
 }
 
-// ---------- AUTH (very simple session-token, good enough for 2-person private chat) ----------
+// ---------- AUTH (very simple session-token) ----------
 const sessions = new Map(); // token -> username
 
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   const u = USERS[username];
   if (!u || u.password !== password) {
-    return res.status(401).json({ error: 'Sai tài khoản hoặc mật khẩu' });
+    return res.status(401).json({ error: 'Invalid username or password' });
   }
   const token = crypto.randomBytes(24).toString('hex');
   sessions.set(token, username);
@@ -80,38 +80,56 @@ function authFromToken(token) {
 }
 
 app.get('/api/history', async (req, res) => {
-  const username = authFromToken(req.query.token);
-  if (!username) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const username = authFromToken(req.query.token);
+    if (!username) return res.status(401).json({ error: 'Unauthorized' });
 
-  const other = otherUser(username);
-  const [rows] = await pool.query(
-    `SELECT m.*,
-       (SELECT JSON_ARRAYAGG(JSON_OBJECT('username', r.username, 'emoji', r.emoji))
-        FROM reactions r WHERE r.message_id = m.id) as reactions
-     FROM messages m
-     WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)
-     ORDER BY created_at ASC
-     LIMIT 200`,
-    [username, other, other, username]
-  );
+    const other = otherUser(username);
+    const [rows] = await pool.query(
+      `SELECT m.*,
+         (SELECT JSON_ARRAYAGG(JSON_OBJECT('username', r.username, 'emoji', r.emoji))
+          FROM reactions r WHERE r.message_id = m.id) as reactions
+       FROM messages m
+       WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)
+       ORDER BY created_at ASC
+       LIMIT 200`,
+      [username, other, other, username]
+    );
 
-  const messages = rows.map(r => ({
-    ...r,
-    reactions: r.reactions ? JSON.parse(r.reactions) : []
-  }));
+    const messages = rows.map(r => {
+      let parsedReactions = [];
+      if (r.reactions) {
+        if (typeof r.reactions === 'object') {
+          parsedReactions = r.reactions;
+        } else if (typeof r.reactions === 'string') {
+          try {
+            parsedReactions = JSON.parse(r.reactions);
+          } catch {
+            parsedReactions = [];
+          }
+        }
+      }
+      return {
+        ...r,
+        reactions: Array.isArray(parsedReactions) ? parsedReactions : []
+      };
+    });
 
-  // mark incoming messages as read on history load
-  await pool.query(
-    `UPDATE messages SET status = 'read' WHERE sender = ? AND recipient = ? AND status != 'read'`,
-    [other, username]
-  );
+    // mark incoming messages as read on history load
+    await pool.query(
+      `UPDATE messages SET status = 'read' WHERE sender = ? AND recipient = ? AND status != 'read'`,
+      [other, username]
+    );
 
-  res.json({ messages, me: username, other });
-  broadcastReadReceipt(username, other);
+    res.json({ messages, me: username, other });
+    broadcastReadReceipt(username, other);
+  } catch (err) {
+    console.error('[API Error] /api/history:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 // ---------- WEBSOCKET ----------
-// clients: username -> Set of ws connections (allow multiple tabs)
 const clients = new Map();
 
 function send(ws, data) {
@@ -149,63 +167,66 @@ wss.on('connection', (ws, req) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
-    if (msg.type === 'typing') {
-      sendToUser(other, { type: 'typing', from: username, isTyping: !!msg.isTyping });
-      return;
-    }
-
-    if (msg.type === 'message') {
-      const id = crypto.randomUUID();
-      const created_at = Date.now();
-      const content = String(msg.content || '').slice(0, 4000).trim();
-      if (!content) return;
-
-      await pool.query(
-        `INSERT INTO messages (id, sender, recipient, content, status, created_at) VALUES (?, ?, ?, ?, 'sent', ?)`,
-        [id, username, other, content, created_at]
-      );
-
-      const payload = { type: 'message', id, sender: username, recipient: other, content, status: 'sent', created_at, reactions: [] };
-
-      send(ws, { ...payload, self: true });
-
-      const otherOnline = (clients.get(other) || new Set()).size > 0;
-      if (otherOnline) {
-        sendToUser(other, payload);
-        await pool.query(`UPDATE messages SET status = 'delivered' WHERE id = ?`, [id]);
-        send(ws, { type: 'status_update', id, status: 'delivered' });
+    try {
+      if (msg.type === 'typing') {
+        sendToUser(other, { type: 'typing', from: username, isTyping: !!msg.isTyping });
+        return;
       }
-      return;
-    }
 
-    if (msg.type === 'read_ack') {
-      // recipient confirms they've seen messages up to now
-      await pool.query(
-        `UPDATE messages SET status = 'read' WHERE sender = ? AND recipient = ? AND status != 'read'`,
-        [other, username]
-      );
-      sendToUser(other, { type: 'read_receipt', by: username });
-      return;
-    }
+      if (msg.type === 'message') {
+        const id = crypto.randomUUID();
+        const created_at = Date.now();
+        const content = String(msg.content || '').slice(0, 4000).trim();
+        if (!content) return;
 
-    if (msg.type === 'reaction') {
-      const { messageId, emoji } = msg;
-      if (!messageId || !emoji) return;
-
-      if (emoji === null) {
-        await pool.query(`DELETE FROM reactions WHERE message_id = ? AND username = ?`, [messageId, username]);
-      } else {
-        const rid = crypto.randomUUID();
         await pool.query(
-          `INSERT INTO reactions (id, message_id, username, emoji) VALUES (?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE emoji = VALUES(emoji)`,
-          [rid, messageId, username, emoji]
+          `INSERT INTO messages (id, sender, recipient, content, status, created_at) VALUES (?, ?, ?, ?, 'sent', ?)`,
+          [id, username, other, content, created_at]
         );
+
+        const payload = { type: 'message', id, sender: username, recipient: other, content, status: 'sent', created_at, reactions: [] };
+
+        send(ws, { ...payload, self: true });
+
+        const otherOnline = (clients.get(other) || new Set()).size > 0;
+        if (otherOnline) {
+          sendToUser(other, payload);
+          await pool.query(`UPDATE messages SET status = 'delivered' WHERE id = ?`, [id]);
+          send(ws, { type: 'status_update', id, status: 'delivered' });
+        }
+        return;
       }
-      const payload = { type: 'reaction', messageId, username, emoji };
-      send(ws, payload);
-      sendToUser(other, payload);
-      return;
+
+      if (msg.type === 'read_ack') {
+        await pool.query(
+          `UPDATE messages SET status = 'read' WHERE sender = ? AND recipient = ? AND status != 'read'`,
+          [other, username]
+        );
+        sendToUser(other, { type: 'read_receipt', by: username });
+        return;
+      }
+
+      if (msg.type === 'reaction') {
+        const { messageId, emoji } = msg;
+        if (!messageId) return;
+
+        if (emoji === null) {
+          await pool.query(`DELETE FROM reactions WHERE message_id = ? AND username = ?`, [messageId, username]);
+        } else {
+          const rid = crypto.randomUUID();
+          await pool.query(
+            `INSERT INTO reactions (id, message_id, username, emoji) VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE emoji = VALUES(emoji)`,
+            [rid, messageId, username, emoji]
+          );
+        }
+        const payload = { type: 'reaction', messageId, username, emoji };
+        send(ws, payload);
+        sendToUser(other, payload);
+        return;
+      }
+    } catch (err) {
+      console.error('[WS Message Error]:', err);
     }
   });
 
