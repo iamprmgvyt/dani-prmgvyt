@@ -5,15 +5,37 @@ const { WebSocketServer } = require('ws');
 const mysql = require('mysql2/promise');
 const path = require('path');
 const crypto = require('crypto');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
+// Tự động tạo thư mục public/uploads nếu chưa có
+const uploadsDir = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Cấu hình Multer lưu file
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const name = crypto.randomUUID() + ext;
+    cb(null, name);
+  }
+});
+const upload = multer({ 
+  storage, 
+  limits: { fileSize: 50 * 1024 * 1024 } // Giới hạn 50MB
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// ---------- USERS (hardcoded 2-user system, no signup needed) ----------
+// ---------- USERS ----------
 const USERS = {
   dani: { username: 'dani', displayName: 'Dani', password: process.env.DANI_PASSWORD || 'dani123' },
   prmgvyt: { username: 'prmgvyt', displayName: 'prmgvyt', password: process.env.PRMGVYT_PASSWORD || 'prmgvyt123' }
@@ -24,7 +46,7 @@ let pool;
 
 async function initDb() {
   pool = mysql.createPool({
-    uri: process.env.DATABASE_URL, // Render MySQL/PlanetScale/etc connection string
+    uri: process.env.DATABASE_URL,
     waitForConnections: true,
     connectionLimit: 5,
     queueLimit: 0,
@@ -61,8 +83,8 @@ function otherUser(username) {
   return username === 'dani' ? 'prmgvyt' : 'dani';
 }
 
-// ---------- AUTH (very simple session-token) ----------
-const sessions = new Map(); // token -> username
+// ---------- AUTH ----------
+const sessions = new Map();
 
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
@@ -78,6 +100,20 @@ app.post('/api/login', (req, res) => {
 function authFromToken(token) {
   return sessions.get(token) || null;
 }
+
+// ---------- API UPLOAD FILE ----------
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  const token = req.headers.authorization || req.body.token || req.query.token;
+  const username = authFromToken(token);
+  if (!username) return res.status(401).json({ error: 'Unauthorized' });
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+  res.json({
+    fileUrl: `/uploads/${req.file.filename}`,
+    fileName: req.file.originalname,
+    fileType: req.file.mimetype
+  });
+});
 
 app.get('/api/history', async (req, res) => {
   try {
@@ -102,11 +138,7 @@ app.get('/api/history', async (req, res) => {
         if (typeof r.reactions === 'object') {
           parsedReactions = r.reactions;
         } else if (typeof r.reactions === 'string') {
-          try {
-            parsedReactions = JSON.parse(r.reactions);
-          } catch {
-            parsedReactions = [];
-          }
+          try { parsedReactions = JSON.parse(r.reactions); } catch { parsedReactions = []; }
         }
       }
       return {
@@ -115,7 +147,6 @@ app.get('/api/history', async (req, res) => {
       };
     });
 
-    // mark incoming messages as read on history load
     await pool.query(
       `UPDATE messages SET status = 'read' WHERE sender = ? AND recipient = ? AND status != 'read'`,
       [other, username]
@@ -176,7 +207,7 @@ wss.on('connection', (ws, req) => {
       if (msg.type === 'message') {
         const id = crypto.randomUUID();
         const created_at = Date.now();
-        const content = String(msg.content || '').slice(0, 4000).trim();
+        const content = String(msg.content || '').slice(0, 10000).trim();
         if (!content) return;
 
         await pool.query(
