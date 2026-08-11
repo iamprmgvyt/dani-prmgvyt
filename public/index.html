@@ -27,7 +27,6 @@
     overflow: hidden;
   }
 
-  /* ---------- LOGIN ---------- */
   #login-screen {
     height: 100%;
     display: flex;
@@ -42,63 +41,33 @@
     border-radius: 8px;
     padding: 32px 28px;
   }
-  .login-box h1 {
-    font-size: 15px;
-    color: var(--accent);
-    letter-spacing: 2px;
-    margin-bottom: 4px;
-  }
+  .login-box h1 { font-size: 15px; color: var(--accent); letter-spacing: 2px; margin-bottom: 4px; }
   .login-box .sub { color: var(--text-dim); font-size: 11px; margin-bottom: 24px; }
   .login-box input {
-    width: 100%;
-    background: #0d1216;
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 10px 12px;
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: 13px;
-    margin-bottom: 12px;
-    outline: none;
+    width: 100%; background: #0d1216; border: 1px solid var(--border);
+    color: var(--text); padding: 10px 12px; border-radius: 4px; font-family: inherit;
+    font-size: 13px; margin-bottom: 12px; outline: none;
   }
   .login-box input:focus { border-color: var(--accent-dim); }
   .login-box button {
-    width: 100%;
-    padding: 10px;
-    background: var(--accent);
-    color: #04140a;
-    border: none;
-    border-radius: 4px;
-    font-family: inherit;
-    font-weight: 700;
-    font-size: 12px;
-    letter-spacing: 1px;
-    cursor: pointer;
-    margin-top: 4px;
+    width: 100%; padding: 10px; background: var(--accent); color: #04140a;
+    border: none; border-radius: 4px; font-family: inherit; font-weight: 700;
+    font-size: 12px; letter-spacing: 1px; cursor: pointer; margin-top: 4px;
   }
   .login-box button:hover { opacity: 0.9; }
   .login-err { color: var(--danger); font-size: 11px; margin-top: 10px; min-height: 14px; }
 
-  /* ---------- CHAT ---------- */
   #chat-screen { display: none; height: 100%; flex-direction: column; position: relative; }
   #chat-screen.active { display: flex; }
 
   header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 18px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; background: var(--panel); border-bottom: 1px solid var(--border); flex-shrink: 0;
   }
   .peer-info { display: flex; align-items: center; gap: 10px; }
   .avatar {
-    width: 32px; height: 32px;
-    border-radius: 50%;
-    background: var(--bubble-me);
-    border: 1px solid var(--accent-dim);
-    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 50%; background: var(--bubble-me);
+    border: 1px solid var(--accent-dim); display: flex; align-items: center; justify-content: center;
     font-size: 13px; color: var(--accent); font-weight: 700;
   }
   .peer-name { font-size: 13px; font-weight: 700; }
@@ -112,12 +81,8 @@
   #logout-btn:hover { border-color: var(--danger); color: var(--danger); }
 
   #messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px 16px 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
+    flex: 1; overflow-y: auto; padding: 20px 16px 8px;
+    display: flex; flex-direction: column; gap: 3px;
   }
   #messages::-webkit-scrollbar { width: 6px; }
   #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -127,28 +92,20 @@
   .msg-row.other { justify-content: flex-start; }
 
   .bubble-wrap { max-width: 72%; position: relative; }
+  
+  .reply-preview-box {
+    font-size: 11px; background: rgba(0,0,0,0.25); border-left: 3px solid var(--accent);
+    padding: 4px 8px; margin-bottom: 4px; border-radius: 4px; color: var(--text-dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  }
+
   .bubble {
-    padding: 9px 13px;
-    border-radius: 14px;
-    font-size: 13.5px;
-    line-height: 1.45;
-    word-wrap: break-word;
-    white-space: pre-wrap;
-    cursor: pointer;
-    position: relative;
+    padding: 9px 13px; border-radius: 14px; font-size: 13.5px;
+    line-height: 1.45; word-wrap: break-word; white-space: pre-wrap;
+    cursor: pointer; position: relative;
   }
-  .bubble img {
-    max-width: 100%;
-    max-height: 250px;
-    border-radius: 8px;
-    display: block;
-    margin-top: 4px;
-  }
-  .bubble a {
-    color: var(--accent);
-    text-decoration: underline;
-    word-break: break-all;
-  }
+  .bubble img { max-width: 100%; max-height: 250px; border-radius: 8px; display: block; margin-top: 4px; }
+  .bubble a { color: var(--accent); text-decoration: underline; word-break: break-all; }
   .me .bubble { background: var(--bubble-me); border: 1px solid var(--accent-dim); border-bottom-right-radius: 3px; }
   .other .bubble { background: var(--bubble-other); border: 1px solid var(--border); border-bottom-left-radius: 3px; }
 
@@ -166,16 +123,9 @@
   }
 
   .emoji-picker-quick {
-    position: absolute;
-    top: -38px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 5px 8px;
-    display: none;
-    gap: 4px;
-    z-index: 10;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    position: absolute; top: -38px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 20px; padding: 5px 8px;
+    display: none; gap: 4px; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
   }
   .me .emoji-picker-quick { right: 0; }
   .other .emoji-picker-quick { left: 0; }
@@ -190,77 +140,49 @@
   }
 
   #typing-indicator {
-    padding: 0 18px 4px;
-    font-size: 11px;
-    color: var(--accent);
-    height: 18px;
-    flex-shrink: 0;
+    padding: 0 18px 4px; font-size: 11px; color: var(--accent);
+    height: 18px; flex-shrink: 0;
   }
   #typing-indicator span { animation: blink 1.4s infinite; }
   @keyframes blink { 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
 
-  /* Input Bar & Full Emoji Picker */
+  /* REPLY BAR ABOVE INPUT */
+  #reply-bar {
+    display: none; align-items: center; justify-content: space-between;
+    background: #0d1216; padding: 6px 16px; border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text-dim); border-left: 3px solid var(--accent);
+  }
+  #reply-bar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%; }
+  #cancel-reply-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-weight: bold; }
+
   #input-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px;
-    background: var(--panel);
-    border-top: 1px solid var(--border);
-    flex-shrink: 0;
-    position: relative;
+    display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+    background: var(--panel); border-top: 1px solid var(--border); flex-shrink: 0; position: relative;
   }
   #msg-input {
-    flex: 1;
-    background: #0d1216;
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 10px 14px;
-    border-radius: 18px;
-    font-family: inherit;
-    font-size: 13px;
-    outline: none;
-    resize: none;
-    max-height: 120px;
+    flex: 1; background: #0d1216; border: 1px solid var(--border); color: var(--text);
+    padding: 10px 14px; border-radius: 18px; font-family: inherit; font-size: 13px;
+    outline: none; resize: none; max-height: 120px;
   }
   #msg-input:focus { border-color: var(--accent-dim); }
 
   .icon-btn {
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    font-size: 18px;
-    cursor: pointer;
-    padding: 6px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.2s;
+    background: none; border: none; color: var(--text-dim); font-size: 18px;
+    cursor: pointer; padding: 6px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; transition: color 0.2s;
   }
   .icon-btn:hover { color: var(--accent); }
 
   #send-btn {
-    background: var(--accent);
-    color: #04140a;
-    border: none;
-    width: 38px; height: 38px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 15px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
+    background: var(--accent); color: #04140a; border: none;
+    width: 38px; height: 38px; border-radius: 50%; cursor: pointer;
+    font-size: 15px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   #send-btn:hover { opacity: 0.9; }
 
   emoji-picker {
-    position: absolute;
-    bottom: 65px;
-    right: 16px;
-    z-index: 100;
-    display: none;
-    --num-columns: 8;
-    --category-emoji-size: 1.1rem;
+    position: absolute; bottom: 65px; right: 16px; z-index: 100; display: none;
+    --num-columns: 8; --category-emoji-size: 1.1rem;
   }
 </style>
 </head>
@@ -292,9 +214,14 @@
   <div id="messages"></div>
   <div id="typing-indicator"></div>
 
+  <div id="reply-bar">
+    <span id="reply-text">Replying...</span>
+    <button id="cancel-reply-btn">✕</button>
+  </div>
+
   <div id="input-bar">
     <input type="file" id="file-input" style="display:none">
-    <button type="button" class="icon-btn" id="attach-btn" title="Attach File">📎</button>
+    <button type="button" class="icon-btn" id="attach-btn" title="Attach File (Max 100MB)">📎</button>
     <button type="button" class="icon-btn" id="emoji-btn" title="Pick Emoji">😊</button>
     <textarea id="msg-input" placeholder="Type a message..." rows="1"></textarea>
     <button id="send-btn">➤</button>
@@ -306,7 +233,35 @@
 <script>
 const QUICK_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
 let ws = null;
-let state = { token: null, me: null, other: null, messages: [], typingTimeout: null };
+let state = { token: null, me: null, other: null, messages: [], typingTimeout: null, replyToMsg: null };
+
+// Am thanh thong bao (Beep sound)
+function playNotiSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5 note
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+  } catch (e) {}
+}
+
+function requestNotificationPermission() {
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+
+function showNotification(title, body) {
+  if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+    new Notification(title, { body, icon: '/favicon.ico' });
+  }
+}
 
 // ---------- LOGIN ----------
 const loginBtn = document.getElementById('login-btn');
@@ -329,6 +284,7 @@ async function doLogin() {
     state.me = data.username;
     localStorage.setItem('chat_token', data.token);
     localStorage.setItem('chat_user', data.username);
+    requestNotificationPermission();
     startChat();
   } catch (e) {
     loginErr.textContent = 'Unable to connect to server';
@@ -343,6 +299,7 @@ window.addEventListener('load', () => {
   if (t && u) {
     state.token = t;
     state.me = u;
+    requestNotificationPermission();
     startChat();
   }
 });
@@ -406,12 +363,24 @@ function connectWs() {
   });
 }
 
+function parseTextContent(text) {
+  try {
+    if (text.startsWith('{') && text.endsWith('}')) {
+      const parsed = JSON.parse(text);
+      if (parsed.type === 'file') return `[File] ${parsed.fileName}`;
+    }
+  } catch (e) {}
+  return text;
+}
+
 function handleWsMessage(msg) {
   if (msg.type === 'message') {
     if (!msg.self) {
       state.messages.push(msg);
       renderMessages();
       ws.send(JSON.stringify({ type: 'read_ack' }));
+      playNotiSound();
+      showNotification(`New message from ${msg.sender}`, parseTextContent(msg.content));
     } else {
       const idx = state.messages.findIndex(m => m.id === msg.id);
       if (idx === -1) state.messages.push(msg);
@@ -485,10 +454,17 @@ function renderMessages() {
     const wrap = document.createElement('div');
     wrap.className = 'bubble-wrap';
 
+    // Reply Box Render
+    if (m.reply_to_id || m.reply_content) {
+      const rBox = document.createElement('div');
+      rBox.className = 'reply-preview-box';
+      rBox.textContent = `${m.reply_sender || 'User'}: ${parseTextContent(m.reply_content || '')}`;
+      wrap.appendChild(rBox);
+    }
+
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
 
-    // Parse content (Check if file/image JSON)
     let isFile = false;
     try {
       if (m.content.startsWith('{') && m.content.endsWith('}')) {
@@ -508,6 +484,12 @@ function renderMessages() {
       bubble.textContent = m.content;
     }
 
+    // Double click or Click to Reply
+    bubble.onclick = (ev) => {
+      ev.stopPropagation();
+      setReplyTo(m);
+    };
+
     // Quick Reaction Bar
     const picker = document.createElement('div');
     picker.className = 'emoji-picker-quick';
@@ -525,11 +507,6 @@ function renderMessages() {
       };
       picker.appendChild(span);
     });
-    bubble.onclick = (ev) => {
-      ev.stopPropagation();
-      document.querySelectorAll('.emoji-picker-quick.force-show').forEach(p => { if (p !== picker) p.classList.remove('force-show'); });
-      picker.classList.toggle('force-show');
-    };
 
     wrap.appendChild(picker);
     wrap.appendChild(bubble);
@@ -575,7 +552,25 @@ document.addEventListener('click', () => {
   document.getElementById('full-emoji-picker').style.display = 'none';
 });
 
-// ---------- FILE UPLOAD & FULL EMOJI PICKER ----------
+// ---------- REPLY SYSTEM ----------
+const replyBar = document.getElementById('reply-bar');
+const replyText = document.getElementById('reply-text');
+const cancelReplyBtn = document.getElementById('cancel-reply-btn');
+
+function setReplyTo(msg) {
+  state.replyToMsg = msg;
+  replyText.textContent = `Replying to ${msg.sender}: "${parseTextContent(msg.content)}"`;
+  replyBar.style.display = 'flex';
+  document.getElementById('msg-input').focus();
+}
+
+function cancelReply() {
+  state.replyToMsg = null;
+  replyBar.style.display = 'none';
+}
+cancelReplyBtn.addEventListener('click', cancelReply);
+
+// ---------- FILE UPLOAD & EMOJI ----------
 const fileInput = document.getElementById('file-input');
 const attachBtn = document.getElementById('attach-btn');
 const emojiBtn = document.getElementById('emoji-btn');
@@ -588,6 +583,12 @@ attachBtn.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', async () => {
   if (!fileInput.files.length) return;
   const file = fileInput.files[0];
+  if (file.size > 100 * 1024 * 1024) {
+    alert('File exceeds 100MB limit');
+    fileInput.value = '';
+    return;
+  }
+
   const formData = new FormData();
   formData.append('file', file);
 
@@ -604,7 +605,14 @@ fileInput.addEventListener('change', async () => {
         fileName: data.fileName,
         fileType: data.fileType
       });
-      ws.send(JSON.stringify({ type: 'message', content: filePayload }));
+      
+      const payload = { type: 'message', content: filePayload };
+      if (state.replyToMsg) {
+        payload.reply_to_id = state.replyToMsg.id;
+        cancelReply();
+      }
+
+      ws.send(JSON.stringify(payload));
     } else {
       alert(data.error || 'Upload failed');
     }
@@ -655,7 +663,14 @@ function sendMessage() {
     alert('Connecting to server... Please try again in a moment.');
     return;
   }
-  ws.send(JSON.stringify({ type: 'message', content }));
+
+  const payload = { type: 'message', content };
+  if (state.replyToMsg) {
+    payload.reply_to_id = state.replyToMsg.id;
+    cancelReply();
+  }
+
+  ws.send(JSON.stringify(payload));
   input.value = '';
   autoResize();
   clearTimeout(state.typingTimeout);
