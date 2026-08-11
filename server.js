@@ -15,8 +15,8 @@ app.use(express.json());
 
 // ---------- USERS (hardcoded 2-user system, no signup needed) ----------
 const USERS = {
-  dani: { username: 'dani', displayName: 'Dani', password: process.env.DANI_PASSWORD || 'dani' },
-  prmgvyt: { username: 'prmgvyt', displayName: 'prmgvyt', password: process.env.PRMGVYT_PASSWORD || 'prmgvyt' }
+  dani: { username: 'dani', displayName: 'Dani', password: process.env.DANI_PASSWORD || 'dani123' },
+  prmgvyt: { username: 'prmgvyt', displayName: 'prmgvyt', password: process.env.PRMGVYT_PASSWORD || 'prmgvyt123' }
 };
 
 // ---------- DB POOL ----------
