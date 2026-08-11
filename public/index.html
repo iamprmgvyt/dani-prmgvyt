@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
@@ -228,7 +228,7 @@
 
 <div id="login-screen">
   <div class="login-box">
-    <h1>AEGIX CHAT</h1>
+    <h1>CHAT</h1>
     <div class="sub">secure 2-user channel</div>
     <input type="text" id="login-username" placeholder="username" autocomplete="off">
     <input type="password" id="login-password" placeholder="password">
@@ -253,7 +253,7 @@
   <div id="typing-indicator"></div>
 
   <div id="input-bar">
-    <textarea id="msg-input" placeholder="Nhắn gì đó..." rows="1"></textarea>
+    <textarea id="msg-input" placeholder="Type a message..." rows="1"></textarea>
     <button id="send-btn">➤</button>
   </div>
 </div>
@@ -282,11 +282,11 @@ async function doLogin() {
 
     state.token = data.token;
     state.me = data.username;
-    localStorage.setItem('aegix_chat_token', data.token);
-    localStorage.setItem('aegix_chat_user', data.username);
+    localStorage.setItem('chat_token', data.token);
+    localStorage.setItem('chat_user', data.username);
     startChat();
   } catch (e) {
-    loginErr.textContent = 'Không kết nối được server';
+    loginErr.textContent = 'Unable to connect to server';
   }
 }
 loginBtn.addEventListener('click', doLogin);
@@ -294,8 +294,8 @@ document.getElementById('login-password').addEventListener('keydown', e => { if 
 
 // auto-login if token saved
 window.addEventListener('load', () => {
-  const t = localStorage.getItem('aegix_chat_token');
-  const u = localStorage.getItem('aegix_chat_user');
+  const t = localStorage.getItem('chat_token');
+  const u = localStorage.getItem('chat_user');
   if (t && u) {
     state.token = t;
     state.me = u;
@@ -304,8 +304,8 @@ window.addEventListener('load', () => {
 });
 
 document.getElementById('logout-btn').addEventListener('click', () => {
-  localStorage.removeItem('aegix_chat_token');
-  localStorage.removeItem('aegix_chat_user');
+  localStorage.removeItem('chat_token');
+  localStorage.removeItem('chat_user');
   location.reload();
 });
 
@@ -386,7 +386,7 @@ function setPresence(online) {
 function showTyping(isTyping) {
   const el = document.getElementById('typing-indicator');
   const displayNames = { dani: 'Dani', prmgvyt: 'prmgvyt' };
-  el.innerHTML = isTyping ? `${displayNames[state.other]} đang gõ<span>...</span>` : '';
+  el.innerHTML = isTyping ? `${displayNames[state.other]} is typing<span>...</span>` : '';
   scrollToBottom();
 }
 
@@ -395,14 +395,14 @@ const messagesEl = document.getElementById('messages');
 
 function formatTime(ts) {
   const d = new Date(ts);
-  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatDay(ts) {
   const d = new Date(ts);
   const today = new Date();
-  if (d.toDateString() === today.toDateString()) return 'Hôm nay';
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  return d.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function renderMessages() {
