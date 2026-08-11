@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Chat</title>
+<script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1/index.js"></script>
 <style>
   :root {
     --bg: #0a0e12;
@@ -79,7 +80,7 @@
   .login-err { color: var(--danger); font-size: 11px; margin-top: 10px; min-height: 14px; }
 
   /* ---------- CHAT ---------- */
-  #chat-screen { display: none; height: 100%; flex-direction: column; }
+  #chat-screen { display: none; height: 100%; flex-direction: column; position: relative; }
   #chat-screen.active { display: flex; }
 
   header {
@@ -136,6 +137,18 @@
     cursor: pointer;
     position: relative;
   }
+  .bubble img {
+    max-width: 100%;
+    max-height: 250px;
+    border-radius: 8px;
+    display: block;
+    margin-top: 4px;
+  }
+  .bubble a {
+    color: var(--accent);
+    text-decoration: underline;
+    word-break: break-all;
+  }
   .me .bubble { background: var(--bubble-me); border: 1px solid var(--accent-dim); border-bottom-right-radius: 3px; }
   .other .bubble { background: var(--bubble-other); border: 1px solid var(--border); border-bottom-left-radius: 3px; }
 
@@ -152,7 +165,7 @@
     display: flex; align-items: center; gap: 2px;
   }
 
-  .emoji-picker {
+  .emoji-picker-quick {
     position: absolute;
     top: -38px;
     background: var(--panel);
@@ -164,12 +177,12 @@
     z-index: 10;
     box-shadow: 0 4px 12px rgba(0,0,0,0.5);
   }
-  .me .emoji-picker { right: 0; }
-  .other .emoji-picker { left: 0; }
-  .bubble-wrap:hover .emoji-picker,
-  .emoji-picker.force-show { display: flex; }
-  .emoji-picker span { cursor: pointer; font-size: 15px; transition: transform 0.1s; }
-  .emoji-picker span:hover { transform: scale(1.3); }
+  .me .emoji-picker-quick { right: 0; }
+  .other .emoji-picker-quick { left: 0; }
+  .bubble-wrap:hover .emoji-picker-quick,
+  .emoji-picker-quick.force-show { display: flex; }
+  .emoji-picker-quick span { cursor: pointer; font-size: 15px; transition: transform 0.1s; }
+  .emoji-picker-quick span:hover { transform: scale(1.3); }
 
   .day-divider {
     text-align: center; color: var(--text-dim); font-size: 10px;
@@ -186,14 +199,16 @@
   #typing-indicator span { animation: blink 1.4s infinite; }
   @keyframes blink { 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
 
+  /* Input Bar & Full Emoji Picker */
   #input-bar {
     display: flex;
-    align-items: flex-end;
-    gap: 10px;
+    align-items: center;
+    gap: 8px;
     padding: 12px 16px;
     background: var(--panel);
     border-top: 1px solid var(--border);
     flex-shrink: 0;
+    position: relative;
   }
   #msg-input {
     flex: 1;
@@ -209,6 +224,22 @@
     max-height: 120px;
   }
   #msg-input:focus { border-color: var(--accent-dim); }
+
+  .icon-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+  }
+  .icon-btn:hover { color: var(--accent); }
+
   #send-btn {
     background: var(--accent);
     color: #04140a;
@@ -221,7 +252,16 @@
     flex-shrink: 0;
   }
   #send-btn:hover { opacity: 0.9; }
-  #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  emoji-picker {
+    position: absolute;
+    bottom: 65px;
+    right: 16px;
+    z-index: 100;
+    display: none;
+    --num-columns: 8;
+    --category-emoji-size: 1.1rem;
+  }
 </style>
 </head>
 <body>
@@ -253,13 +293,18 @@
   <div id="typing-indicator"></div>
 
   <div id="input-bar">
+    <input type="file" id="file-input" style="display:none">
+    <button type="button" class="icon-btn" id="attach-btn" title="Attach File">📎</button>
+    <button type="button" class="icon-btn" id="emoji-btn" title="Pick Emoji">😊</button>
     <textarea id="msg-input" placeholder="Type a message..." rows="1"></textarea>
     <button id="send-btn">➤</button>
+
+    <emoji-picker id="full-emoji-picker" class="dark"></emoji-picker>
   </div>
 </div>
 
 <script>
-const EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
+const QUICK_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
 let ws = null;
 let state = { token: null, me: null, other: null, messages: [], typingTimeout: null };
 
@@ -292,7 +337,6 @@ async function doLogin() {
 loginBtn.addEventListener('click', doLogin);
 document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
-// auto-login if token saved
 window.addEventListener('load', () => {
   const t = localStorage.getItem('chat_token');
   const u = localStorage.getItem('chat_user');
@@ -358,7 +402,7 @@ function connectWs() {
   });
 
   ws.addEventListener('close', () => {
-    setTimeout(connectWs, 2000); // auto-reconnect
+    setTimeout(connectWs, 2000);
   });
 }
 
@@ -405,7 +449,7 @@ function showTyping(isTyping) {
   scrollToBottom();
 }
 
-// ---------- RENDER ----------
+// ---------- RENDER MESSAGES ----------
 const messagesEl = document.getElementById('messages');
 
 function formatTime(ts) {
@@ -443,11 +487,31 @@ function renderMessages() {
 
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    bubble.textContent = m.content;
 
+    // Parse content (Check if file/image JSON)
+    let isFile = false;
+    try {
+      if (m.content.startsWith('{') && m.content.endsWith('}')) {
+        const fileData = JSON.parse(m.content);
+        if (fileData.type === 'file') {
+          isFile = true;
+          if (fileData.fileType && fileData.fileType.startsWith('image/')) {
+            bubble.innerHTML = `<a href="${fileData.fileUrl}" target="_blank"><img src="${fileData.fileUrl}" alt="image" /></a>`;
+          } else {
+            bubble.innerHTML = `📁 <a href="${fileData.fileUrl}" target="_blank" download="${fileData.fileName}">${fileData.fileName}</a>`;
+          }
+        }
+      }
+    } catch (e) {}
+
+    if (!isFile) {
+      bubble.textContent = m.content;
+    }
+
+    // Quick Reaction Bar
     const picker = document.createElement('div');
-    picker.className = 'emoji-picker';
-    EMOJIS.forEach(em => {
+    picker.className = 'emoji-picker-quick';
+    QUICK_EMOJIS.forEach(em => {
       const span = document.createElement('span');
       span.textContent = em;
       span.onclick = (ev) => {
@@ -463,7 +527,7 @@ function renderMessages() {
     });
     bubble.onclick = (ev) => {
       ev.stopPropagation();
-      document.querySelectorAll('.emoji-picker.force-show').forEach(p => { if (p !== picker) p.classList.remove('force-show'); });
+      document.querySelectorAll('.emoji-picker-quick.force-show').forEach(p => { if (p !== picker) p.classList.remove('force-show'); });
       picker.classList.toggle('force-show');
     };
 
@@ -507,12 +571,59 @@ function scrollToBottom() {
 }
 
 document.addEventListener('click', () => {
-  document.querySelectorAll('.emoji-picker.force-show').forEach(p => p.classList.remove('force-show'));
+  document.querySelectorAll('.emoji-picker-quick.force-show').forEach(p => p.classList.remove('force-show'));
+  document.getElementById('full-emoji-picker').style.display = 'none';
 });
 
-// ---------- INPUT / SEND ----------
+// ---------- FILE UPLOAD & FULL EMOJI PICKER ----------
+const fileInput = document.getElementById('file-input');
+const attachBtn = document.getElementById('attach-btn');
+const emojiBtn = document.getElementById('emoji-btn');
+const fullEmojiPicker = document.getElementById('full-emoji-picker');
 const input = document.getElementById('msg-input');
 const sendBtn = document.getElementById('send-btn');
+
+attachBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', async () => {
+  if (!fileInput.files.length) return;
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch(`/api/upload?token=${state.token}`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (res.ok) {
+      const filePayload = JSON.stringify({
+        type: 'file',
+        fileUrl: data.fileUrl,
+        fileName: data.fileName,
+        fileType: data.fileType
+      });
+      ws.send(JSON.stringify({ type: 'message', content: filePayload }));
+    } else {
+      alert(data.error || 'Upload failed');
+    }
+  } catch (err) {
+    alert('Failed to upload file');
+  }
+  fileInput.value = '';
+});
+
+emojiBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const isVisible = fullEmojiPicker.style.display === 'block';
+  fullEmojiPicker.style.display = isVisible ? 'none' : 'block';
+});
+
+fullEmojiPicker.addEventListener('emoji-click', event => {
+  input.value += event.detail.unicode;
+  autoResize();
+});
 
 function autoResize() {
   input.style.height = 'auto';
