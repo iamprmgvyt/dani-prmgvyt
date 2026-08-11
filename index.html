@@ -311,22 +311,33 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 
 // ---------- CHAT INIT ----------
 async function startChat() {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('chat-screen').classList.add('active');
+  try {
+    const res = await fetch(`/api/history?token=${state.token}`);
+    if (!res.ok || res.status === 401) { 
+      localStorage.removeItem('chat_token');
+      localStorage.removeItem('chat_user');
+      location.reload(); 
+      return; 
+    }
+    const data = await res.json();
 
-  const res = await fetch(`/api/history?token=${state.token}`);
-  if (res.status === 401) { localStorage.clear(); location.reload(); return; }
-  const data = await res.json();
+    state.other = data.other;
+    state.messages = data.messages || [];
 
-  state.other = data.other;
-  state.messages = data.messages;
+    const displayNames = { dani: 'Dani', prmgvyt: 'prmgvyt' };
+    if (data.other && displayNames[data.other]) {
+      document.getElementById('peer-name').textContent = displayNames[data.other];
+      document.getElementById('peer-avatar').textContent = displayNames[data.other][0].toUpperCase();
+    }
 
-  const displayNames = { dani: 'Dani', prmgvyt: 'prmgvyt' };
-  document.getElementById('peer-name').textContent = displayNames[state.other];
-  document.getElementById('peer-avatar').textContent = displayNames[state.other][0].toUpperCase();
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('chat-screen').classList.add('active');
 
-  renderMessages();
-  connectWs();
+    renderMessages();
+    connectWs();
+  } catch (err) {
+    console.error('Failed to start chat:', err);
+  }
 }
 
 function connectWs() {
@@ -338,8 +349,12 @@ function connectWs() {
   });
 
   ws.addEventListener('message', (e) => {
-    const msg = JSON.parse(e.data);
-    handleWsMessage(msg);
+    try {
+      const msg = JSON.parse(e.data);
+      handleWsMessage(msg);
+    } catch (err) {
+      console.error(err);
+    }
   });
 
   ws.addEventListener('close', () => {
@@ -439,7 +454,9 @@ function renderMessages() {
         ev.stopPropagation();
         const mine = (m.reactions || []).find(r => r.username === state.me);
         const newEmoji = (mine && mine.emoji === em) ? null : em;
-        ws.send(JSON.stringify({ type: 'reaction', messageId: m.id, emoji: newEmoji }));
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'reaction', messageId: m.id, emoji: newEmoji }));
+        }
         picker.classList.remove('force-show');
       };
       picker.appendChild(span);
@@ -522,7 +539,11 @@ function triggerTyping() {
 
 function sendMessage() {
   const content = input.value.trim();
-  if (!content || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if (!content) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    alert('Connecting to server... Please try again in a moment.');
+    return;
+  }
   ws.send(JSON.stringify({ type: 'message', content }));
   input.value = '';
   autoResize();
