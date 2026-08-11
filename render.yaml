@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: aegix-chat
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: DANI_PASSWORD
+        sync: false
+      - key: PRMGVYT_PASSWORD
+        sync: false
