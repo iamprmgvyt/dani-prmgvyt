@@ -12,13 +12,11 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-// Tự động tạo thư mục public/uploads nếu chưa có
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Cấu hình Multer lưu file
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
@@ -27,21 +25,21 @@ const storage = multer.diskStorage({
     cb(null, name);
   }
 });
+
+// Giới hạn 100MB
 const upload = multer({ 
   storage, 
-  limits: { fileSize: 50 * 1024 * 1024 } // Giới hạn 50MB
+  limits: { fileSize: 100 * 1024 * 1024 } 
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// ---------- USERS ----------
 const USERS = {
   dani: { username: 'dani', displayName: 'Dani', password: process.env.DANI_PASSWORD || 'dani123' },
   prmgvyt: { username: 'prmgvyt', displayName: 'prmgvyt', password: process.env.PRMGVYT_PASSWORD || 'prmgvyt123' }
 };
 
-// ---------- DB POOL ----------
 let pool;
 
 async function initDb() {
@@ -59,11 +57,17 @@ async function initDb() {
       sender VARCHAR(20) NOT NULL,
       recipient VARCHAR(20) NOT NULL,
       content TEXT NOT NULL,
+      reply_to_id VARCHAR(36) NULL,
       status ENUM('sent','delivered','read') NOT NULL DEFAULT 'sent',
       created_at BIGINT NOT NULL,
       INDEX idx_created (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+
+  // Tự động bổ sung cột reply_to_id nếu DB chưa có
+  try {
+    await pool.query(`ALTER TABLE messages ADD COLUMN reply_to_id VARCHAR(36) NULL`);
+  } catch (e) { /* Cột đã tồn tại */ }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reactions (
@@ -83,7 +87,6 @@ function otherUser(username) {
   return username === 'dani' ? 'prmgvyt' : 'dani';
 }
 
-// ---------- AUTH ----------
 const sessions = new Map();
 
 app.post('/api/login', (req, res) => {
@@ -101,7 +104,6 @@ function authFromToken(token) {
   return sessions.get(token) || null;
 }
 
-// ---------- API UPLOAD FILE ----------
 app.post('/api/upload', upload.single('file'), (req, res) => {
   const token = req.headers.authorization || req.body.token || req.query.token;
   const username = authFromToken(token);
@@ -123,11 +125,14 @@ app.get('/api/history', async (req, res) => {
     const other = otherUser(username);
     const [rows] = await pool.query(
       `SELECT m.*,
+         r_msg.sender as reply_sender,
+         r_msg.content as reply_content,
          (SELECT JSON_ARRAYAGG(JSON_OBJECT('username', r.username, 'emoji', r.emoji))
           FROM reactions r WHERE r.message_id = m.id) as reactions
        FROM messages m
-       WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)
-       ORDER BY created_at ASC
+       LEFT JOIN messages r_msg ON m.reply_to_id = r_msg.id
+       WHERE (m.sender = ? AND m.recipient = ?) OR (m.sender = ? AND m.recipient = ?)
+       ORDER BY m.created_at ASC
        LIMIT 200`,
       [username, other, other, username]
     );
@@ -135,9 +140,8 @@ app.get('/api/history', async (req, res) => {
     const messages = rows.map(r => {
       let parsedReactions = [];
       if (r.reactions) {
-        if (typeof r.reactions === 'object') {
-          parsedReactions = r.reactions;
-        } else if (typeof r.reactions === 'string') {
+        if (typeof r.reactions === 'object') parsedReactions = r.reactions;
+        else if (typeof r.reactions === 'string') {
           try { parsedReactions = JSON.parse(r.reactions); } catch { parsedReactions = []; }
         }
       }
@@ -160,7 +164,6 @@ app.get('/api/history', async (req, res) => {
   }
 });
 
-// ---------- WEBSOCKET ----------
 const clients = new Map();
 
 function send(ws, data) {
@@ -208,14 +211,30 @@ wss.on('connection', (ws, req) => {
         const id = crypto.randomUUID();
         const created_at = Date.now();
         const content = String(msg.content || '').slice(0, 10000).trim();
+        const reply_to_id = msg.reply_to_id || null;
         if (!content) return;
 
+        let reply_sender = null;
+        let reply_content = null;
+
+        if (reply_to_id) {
+          const [rRows] = await pool.query(`SELECT sender, content FROM messages WHERE id = ?`, [reply_to_id]);
+          if (rRows.length) {
+            reply_sender = rRows[0].sender;
+            reply_content = rRows[0].content;
+          }
+        }
+
         await pool.query(
-          `INSERT INTO messages (id, sender, recipient, content, status, created_at) VALUES (?, ?, ?, ?, 'sent', ?)`,
-          [id, username, other, content, created_at]
+          `INSERT INTO messages (id, sender, recipient, content, reply_to_id, status, created_at) VALUES (?, ?, ?, ?, ?, 'sent', ?)`,
+          [id, username, other, content, reply_to_id, created_at]
         );
 
-        const payload = { type: 'message', id, sender: username, recipient: other, content, status: 'sent', created_at, reactions: [] };
+        const payload = { 
+          type: 'message', id, sender: username, recipient: other, content, 
+          reply_to_id, reply_sender, reply_content,
+          status: 'sent', created_at, reactions: [] 
+        };
 
         send(ws, { ...payload, self: true });
 
