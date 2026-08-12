@@ -27,6 +27,7 @@
     overflow: hidden;
   }
 
+  /* ---------- LOGIN ---------- */
   #login-screen {
     height: 100%;
     display: flex;
@@ -55,8 +56,9 @@
     font-size: 12px; letter-spacing: 1px; cursor: pointer; margin-top: 4px;
   }
   .login-box button:hover { opacity: 0.9; }
-  .login-err { color: var(--danger); font-size: 11px; margin-top: 10px; min-height: 14px; }
+  .login-err { color: var(--danger); font-size: 11px; margin-top: 10px; min-height: 14px; text-align: center; }
 
+  /* ---------- CHAT ---------- */
   #chat-screen { display: none; height: 100%; flex-direction: column; position: relative; }
   #chat-screen.active { display: flex; }
 
@@ -94,7 +96,7 @@
   .bubble-wrap { max-width: 72%; position: relative; }
   
   .reply-preview-box {
-    font-size: 11px; background: rgba(0,0,0,0.25); border-left: 3px solid var(--accent);
+    font-size: 11px; background: rgba(0,0,0,0.3); border-left: 3px solid var(--accent);
     padding: 4px 8px; margin-bottom: 4px; border-radius: 4px; color: var(--text-dim);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
   }
@@ -146,7 +148,7 @@
   #typing-indicator span { animation: blink 1.4s infinite; }
   @keyframes blink { 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
 
-  /* REPLY BAR ABOVE INPUT */
+  /* REPLY BAR */
   #reply-bar {
     display: none; align-items: center; justify-content: space-between;
     background: #0d1216; padding: 6px 16px; border-top: 1px solid var(--border);
@@ -155,6 +157,7 @@
   #reply-bar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%; }
   #cancel-reply-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-weight: bold; }
 
+  /* INPUT BAR */
   #input-bar {
     display: flex; align-items: center; gap: 8px; padding: 12px 16px;
     background: var(--panel); border-top: 1px solid var(--border); flex-shrink: 0; position: relative;
@@ -232,23 +235,22 @@
 
 <script>
 const QUICK_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
+const CUSTOM_SOUND_URL = '/noti.mp3'; // File âm thanh đặt trong thư mục public/noti.mp3
+
 let ws = null;
 let state = { token: null, me: null, other: null, messages: [], typingTimeout: null, replyToMsg: null };
 
-// Am thanh thong bao (Beep sound)
+// ---------- SOUND & SYSTEM NOTIFICATION ----------
 function playNotiSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5 note
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
-  } catch (e) {}
+    const audio = new Audio(CUSTOM_SOUND_URL);
+    audio.volume = 0.8;
+    audio.play().catch(err => {
+      console.log('Audio waiting for user gesture:', err);
+    });
+  } catch (e) {
+    console.error('Sound error:', e);
+  }
 }
 
 function requestNotificationPermission() {
@@ -258,8 +260,16 @@ function requestNotificationPermission() {
 }
 
 function showNotification(title, body) {
-  if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
-    new Notification(title, { body, icon: '/favicon.ico' });
+  if ("Notification" in window && Notification.permission === "granted") {
+    const noti = new Notification(title, {
+      body: body,
+      tag: 'chat-message-tag',
+      renotify: true
+    });
+    noti.onclick = () => {
+      window.focus();
+      noti.close();
+    };
   }
 }
 
@@ -278,7 +288,10 @@ async function doLogin() {
       body: JSON.stringify({ username, password })
     });
     const data = await res.json();
-    if (!res.ok) { loginErr.textContent = data.error || 'Login failed'; return; }
+    if (!res.ok) { 
+      loginErr.textContent = data.error || 'Login failed'; 
+      return; 
+    }
 
     state.token = data.token;
     state.me = data.username;
@@ -304,7 +317,10 @@ window.addEventListener('load', () => {
   }
 });
 
-document.getElementById('logout-btn').addEventListener('click', () => {
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  if (state.token) {
+    await fetch(`/api/logout?token=${state.token}`, { method: 'POST' });
+  }
   localStorage.removeItem('chat_token');
   localStorage.removeItem('chat_user');
   location.reload();
@@ -358,7 +374,14 @@ function connectWs() {
     }
   });
 
-  ws.addEventListener('close', () => {
+  ws.addEventListener('close', (e) => {
+    if (e.code === 4002) {
+      alert('Account logged in on another device.');
+      localStorage.removeItem('chat_token');
+      localStorage.removeItem('chat_user');
+      location.reload();
+      return;
+    }
     setTimeout(connectWs, 2000);
   });
 }
@@ -379,6 +402,8 @@ function handleWsMessage(msg) {
       state.messages.push(msg);
       renderMessages();
       ws.send(JSON.stringify({ type: 'read_ack' }));
+      
+      // Phát âm thanh + Hiển thị thông báo Windows
       playNotiSound();
       showNotification(`New message from ${msg.sender}`, parseTextContent(msg.content));
     } else {
@@ -454,7 +479,6 @@ function renderMessages() {
     const wrap = document.createElement('div');
     wrap.className = 'bubble-wrap';
 
-    // Reply Box Render
     if (m.reply_to_id || m.reply_content) {
       const rBox = document.createElement('div');
       rBox.className = 'reply-preview-box';
@@ -484,13 +508,11 @@ function renderMessages() {
       bubble.textContent = m.content;
     }
 
-    // Double click or Click to Reply
     bubble.onclick = (ev) => {
       ev.stopPropagation();
       setReplyTo(m);
     };
 
-    // Quick Reaction Bar
     const picker = document.createElement('div');
     picker.className = 'emoji-picker-quick';
     QUICK_EMOJIS.forEach(em => {
