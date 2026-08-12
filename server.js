@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
   }
 });
 
-// Giới hạn 100MB
+// Giới hạn Upload 100MB
 const upload = multer({ 
   storage, 
   limits: { fileSize: 100 * 1024 * 1024 } 
@@ -64,7 +64,6 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
-  // Tự động bổ sung cột reply_to_id nếu DB chưa có
   try {
     await pool.query(`ALTER TABLE messages ADD COLUMN reply_to_id VARCHAR(36) NULL`);
   } catch (e) { /* Cột đã tồn tại */ }
@@ -88,6 +87,11 @@ function otherUser(username) {
 }
 
 const sessions = new Map();
+const activeConnections = new Map(); // Quản lý Single Session
+
+function isUserLoggedIn(username) {
+  return activeConnections.has(username);
+}
 
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
@@ -95,9 +99,29 @@ app.post('/api/login', (req, res) => {
   if (!u || u.password !== password) {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
+
+  // Chặn đăng nhập nếu tài khoản đang được dùng trên thiết bị khác
+  if (isUserLoggedIn(username)) {
+    return res.status(403).json({ error: 'Account already logged in on another device' });
+  }
+
   const token = crypto.randomBytes(24).toString('hex');
   sessions.set(token, username);
   res.json({ token, username, displayName: u.displayName });
+});
+
+app.post('/api/logout', (req, res) => {
+  const token = req.headers.authorization || req.body.token || req.query.token;
+  if (token && sessions.has(token)) {
+    const username = sessions.get(token);
+    sessions.delete(token);
+    if (activeConnections.has(username)) {
+      const ws = activeConnections.get(username);
+      ws.close(1000, 'Logged out');
+      activeConnections.delete(username);
+    }
+  }
+  res.json({ success: true });
 });
 
 function authFromToken(token) {
@@ -164,16 +188,13 @@ app.get('/api/history', async (req, res) => {
   }
 });
 
-const clients = new Map();
-
 function send(ws, data) {
-  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(data));
+  if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(data));
 }
 
 function sendToUser(username, data) {
-  const set = clients.get(username);
-  if (!set) return;
-  for (const ws of set) send(ws, data);
+  const ws = activeConnections.get(username);
+  if (ws) send(ws, data);
 }
 
 function broadcastReadReceipt(reader, otherUsername) {
@@ -190,12 +211,17 @@ wss.on('connection', (ws, req) => {
     return;
   }
 
-  if (!clients.has(username)) clients.set(username, new Set());
-  clients.get(username).add(ws);
+  // Nếu kết nối trùng session thì đóng WebSocket mới lại
+  if (activeConnections.has(username) && activeConnections.get(username) !== ws) {
+    ws.close(4002, 'Already logged in elsewhere');
+    return;
+  }
+
+  activeConnections.set(username, ws);
 
   const other = otherUser(username);
   sendToUser(other, { type: 'presence', username, online: true });
-  send(ws, { type: 'presence', username: other, online: (clients.get(other) || new Set()).size > 0 });
+  send(ws, { type: 'presence', username: other, online: activeConnections.has(other) });
 
   ws.on('message', async (raw) => {
     let msg;
@@ -238,7 +264,7 @@ wss.on('connection', (ws, req) => {
 
         send(ws, { ...payload, self: true });
 
-        const otherOnline = (clients.get(other) || new Set()).size > 0;
+        const otherOnline = activeConnections.has(other);
         if (otherOnline) {
           sendToUser(other, payload);
           await pool.query(`UPDATE messages SET status = 'delivered' WHERE id = ?`, [id]);
@@ -281,13 +307,9 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
-    const set = clients.get(username);
-    if (set) {
-      set.delete(ws);
-      if (set.size === 0) {
-        clients.delete(username);
-        sendToUser(other, { type: 'presence', username, online: false });
-      }
+    if (activeConnections.get(username) === ws) {
+      activeConnections.delete(username);
+      sendToUser(other, { type: 'presence', username, online: false });
     }
   });
 });
