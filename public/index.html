@@ -235,18 +235,37 @@
 
 <script>
 const QUICK_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
-const CUSTOM_SOUND_URL = '/noti.mp3'; // File âm thanh đặt trong thư mục public/noti.mp3
+const CUSTOM_SOUND_URL = '/noti.mp3'; // Đặt file noti.mp3 vào thư mục public
 
 let ws = null;
 let state = { token: null, me: null, other: null, messages: [], typingTimeout: null, replyToMsg: null };
 
-// ---------- SOUND & SYSTEM NOTIFICATION ----------
+// ---------- HỆ THỐNG AUDIO UNLOCK (Phát kể cả khi IDLE/Tab phụ) ----------
+const notiAudio = new Audio(CUSTOM_SOUND_URL);
+notiAudio.volume = 1.0;
+let audioUnlocked = false;
+
+function unlockAudio() {
+  if (audioUnlocked) return;
+  notiAudio.muted = true;
+  notiAudio.play().then(() => {
+    notiAudio.pause();
+    notiAudio.currentTime = 0;
+    notiAudio.muted = false;
+    audioUnlocked = true;
+    document.removeEventListener('click', unlockAudio);
+    document.removeEventListener('keydown', unlockAudio);
+  }).catch(err => console.log('Audio unlock failed:', err));
+}
+
+document.addEventListener('click', unlockAudio);
+document.addEventListener('keydown', unlockAudio);
+
 function playNotiSound() {
   try {
-    const audio = new Audio(CUSTOM_SOUND_URL);
-    audio.volume = 0.8;
-    audio.play().catch(err => {
-      console.log('Audio waiting for user gesture:', err);
+    notiAudio.currentTime = 0;
+    notiAudio.play().catch(err => {
+      console.log('Background playback blocked:', err);
     });
   } catch (e) {
     console.error('Sound error:', e);
@@ -403,7 +422,6 @@ function handleWsMessage(msg) {
       renderMessages();
       ws.send(JSON.stringify({ type: 'read_ack' }));
       
-      // Phát âm thanh + Hiển thị thông báo Windows
       playNotiSound();
       showNotification(`New message from ${msg.sender}`, parseTextContent(msg.content));
     } else {
